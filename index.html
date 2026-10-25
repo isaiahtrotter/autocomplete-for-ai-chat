@@ -1,0 +1,1327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Chat Autocomplete</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f4; --panel: #ffffff; --border: #e7e5e4; --text: #1c1917; --muted: #a8a29e; --soft: #78716c; --line: #d6d3d1;
+    --app-w: 500px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font: inherit; }
+  html, body { background: var(--bg); color: var(--text); }
+  body {
+    font-family: "Geist", sans-serif; font-size: 14px; line-height: 18px; min-height: 100vh; display: flex;
+    padding: 32px 16px; -webkit-font-smoothing: antialiased; user-select: none;
+  }
+  button { font-size: 14px; font-family: inherit; }
+
+  /* ---------- wireframe window: sits left of the chat, which stays centred; it may run off-screen ---------- */
+  body { overflow: hidden; }
+  .wire {
+    position: fixed; top: 50%; right: calc(50% + var(--app-w) / 2 + 8px); transform: translateY(-50%);
+    width: 860px; height: 80vh; background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03), 0 8px 24px rgba(0,0,0,.05);
+    display: flex; flex-direction: column; overflow: hidden; pointer-events: none; user-select: none;
+  }
+  .w-chrome { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: #fff; }
+  .w-tabs { display: flex; gap: 2px; padding: 3px; background: #f5f5f4; border-radius: 8px; font-size: 12px; line-height: 18px; color: var(--soft); }
+  .w-tabs span { padding: 3px 10px; border-radius: 6px; }
+  .w-tabs span.on { background: #fff; color: var(--text); font-weight: 500; box-shadow: 0 0 0 1px var(--border); }
+  .w-url { flex: 1; height: 28px; border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; line-height: 26px; font-size: 12px; color: var(--soft); background: #fff; }
+  .w-device { font-size: 12px; color: var(--soft); }
+  .w-body { flex: 1; min-height: 0; background: #fafaf9; display: flex; justify-content: center; padding: 0 24px; }
+  .w-app { width: 620px; display: flex; flex-direction: column; background: #fff; border-left: 1px solid var(--border); border-right: 1px solid var(--border); font-size: 13px; line-height: 18px; }
+  .w-head { flex: none; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 14px; border-bottom: 1px solid var(--border); background: #fff; }
+  .w-spacer { flex: 1; }
+  .w-logo { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, #6366f1, #ec4899); color: #fff; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+  .w-title { font-weight: 600; color: var(--text); }
+  .w-btn { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 8px; background: #f5f5f4; color: var(--soft); font-size: 12px; font-weight: 500; }
+  .w-btn.dark { background: var(--text); color: #fff; }
+  .w-main { flex: 1; min-height: 0; display: flex; }
+  .w-canvas { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 0 14px 14px; background: #f5f5f4; }
+  .w-art { position: relative; height: 150px; border-radius: 10px; background: linear-gradient(135deg, #c7d2fe, #fbcfe8); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .w-ring { position: absolute; width: 20px; height: 20px; margin: -10px 0 0 -10px; border: 1.5px solid #fff; border-radius: 50%; }
+  .w-cap { text-align: center; font-size: 12px; color: var(--soft); }
+  .w-panel { flex: none; width: 214px; border-left: 1px solid var(--border); overflow: hidden; background: #fff; }
+  .w-sec { display: flex; flex-direction: column; gap: 10px; padding: 16px 14px; border-bottom: 1px solid var(--border); background: #fff; }
+  .w-h { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text); }
+  .w-h span { font-weight: 400; color: var(--muted); }
+  .w-layer { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 6px; border-radius: 6px; font-size: 12px; color: var(--soft); }
+  .w-layer.on { background: #f5f5f4; color: var(--text); }
+  .w-layer i { width: 14px; height: 14px; border-radius: 4px; background: #d6d3d1; flex: none; }
+  .w-layer em { margin-left: auto; font-style: normal; font-size: 11px; color: var(--muted); }
+  .w-add { height: 26px; border: 1px dashed #d6d3d1; border-radius: 6px; display: grid; place-items: center; font-size: 12px; color: var(--soft); }
+  .w-row { display: flex; align-items: center; gap: 8px; }
+  .w-field { flex: 1; display: flex; align-items: center; justify-content: space-between; height: 26px; padding: 0 8px; border-radius: 6px; background: #f5f5f4; font-size: 12px; color: var(--text); }
+  .w-field span { color: var(--muted); }
+  .w-seg { display: flex; gap: 2px; padding: 3px; background: #f5f5f4; border-radius: 6px; font-size: 11px; }
+  .w-seg span { flex: 1; text-align: center; line-height: 18px; border-radius: 4px; color: var(--soft); }
+  .w-seg span:first-child { background: #fff; color: var(--text); box-shadow: 0 0 0 1px var(--border); }
+  .w-slide { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--soft); }
+  .w-slide > div:first-child { display: flex; justify-content: space-between; }
+  .w-slide b { font-weight: 500; color: var(--text); }
+  .w-slider { position: relative; height: 3px; border-radius: 2px; background: #e7e5e4; margin: 0 0 4px; }
+  .w-slider i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #78716c; }
+  .w-slider b { position: absolute; top: -4px; width: 11px; height: 11px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px #78716c; }
+  .w-presets { display: flex; gap: 6px; }
+  .w-presets span { flex: 1; display: grid; place-items: center; height: 40px; border-radius: 6px; background: #e7e5e4; font-size: 11px; color: var(--soft); }
+  .w-presets span:nth-child(2) { background: #f0efed; }
+  .w-presets span:nth-child(3) { background: var(--text); color: #fff; }
+  .w-pills { display: flex; align-items: center; gap: 8px; }
+
+  /* ---------- window ---------- */
+  .app {
+    width: var(--app-w); max-width: 100%; height: 80vh; margin: auto; position: relative; top: -60px;
+    display: flex; flex-direction: column;
+    /* no overflow clipping: the input card's shadow is allowed to spill outside the window's edges */
+  }
+
+  /* grab handles on both side edges: hovering lights the edge with a blue line that peaks at the pointer and fades to nothing at
+     both ends, and a pill rides the pointer up and down. Dragging resizes the (centred) chat window */
+  .grip { --y: 50%; position: absolute; top: 0; bottom: 0; width: 16px; z-index: 30; cursor: ew-resize; touch-action: none; }
+  .grip.l { left: -24px; } .grip.r { right: -24px; }
+  .grip::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; border-radius: 1px; opacity: 0;
+    background: linear-gradient(to bottom, rgba(10, 100, 255, 0), #0a64ff var(--y), rgba(10, 100, 255, 0));
+    transition: opacity .15s ease;
+  }
+  .grip::after {
+    content: ""; position: absolute; left: 50%; top: var(--y); width: 6px; height: 36px; margin: -18px 0 0 -3px; border-radius: 3px; background: #0a64ff; opacity: 0;
+    transition: opacity .15s ease;
+  }
+  .grip:hover::before, .grip.on::before, .grip:hover::after, .grip.on::after { opacity: 1; }
+  body.resizing { cursor: ew-resize; user-select: none; }
+
+  /* ---------- history ---------- */
+  .list {
+    position: relative; flex: 1 1 auto; min-height: 0; margin: 0 -20px; padding: 24px 20px 8px;
+    overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 24px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 24px);
+  }
+  .list::-webkit-scrollbar { display: none; }
+  .msg { user-select: text; overflow-wrap: anywhere; white-space: pre-wrap; animation: fresh-in 250ms linear; }
+  .msg.user { align-self: flex-end; max-width: 94%; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; line-height: 20px; }
+  .msg.ai { line-height: 22px; white-space: normal; }
+  .msg.ai b { font-weight: 600; }
+  @keyframes fresh-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+  .empty { margin: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: var(--muted); }
+  .empty button {
+    border: 1px solid var(--border); background: #fff; color: var(--soft); border-radius: 8px; padding: 6px 10px;
+    text-align: left; cursor: pointer; transition: background .12s ease, color .12s ease;
+  }
+  .empty button:hover { color: var(--text); background: #fafaf9; }
+
+  /* ---------- highlights: amber = vague, green = confirmed, blue = padding value ---------- */
+  /* side padding is cancelled by an equal negative margin, so the highlight is roomier but the text never shifts */
+  mark { color: inherit; font-weight: 500; padding: 1px 4px; border-radius: 6px; box-decoration-break: clone; -webkit-box-decoration-break: clone; transition: background .12s ease, box-shadow .12s ease; }
+  /* same look as the "/Inspiration" chip: a soft wash, no outline, saturated text */
+  mark.amb { color: #ea580c; background: #fff3ea; }
+  mark.ok  { color: #16a34a; background: #edf8f0; }
+  mark.pad { color: #2563eb; background: #eff4ff; }
+  mark.amb.hot { background: #ffe2cc; }
+  mark.ok.hot  { background: #d9f0e0; }
+  mark.pad.hot { background: #dce8ff; }
+
+  /* letters stay display:inline and hop with relative `top` (no inline-block, no transform), so kerning and widths are identical to plain text and the caret never shifts when the wave unwraps */
+  /* a highlight that has just appeared: the background washes in and its letters hop in a quick wave, taking on the colour as they go */
+  :root { --wave-span: 50ms; --wave-hop: 160ms; --wave-bg: 140ms; }
+  mark.pop { animation: mark-in var(--wave-bg) ease-out both; }
+  mark.pop .wd { white-space: nowrap; }
+  mark.pop .lt { position: relative; animation: letter-hop var(--wave-hop) ease-out both; animation-delay: var(--d, 0ms); }
+  @keyframes mark-in { from { background-color: transparent; } }
+  @keyframes letter-hop { 0% { color: var(--text); top: 0; } 45% { top: -3px; } 100% { top: 0; } }
+  @media (prefers-reduced-motion: reduce) { mark.pop, mark.pop .lt { animation: none; } }
+
+  .composer { position: relative; flex: none; padding: 10px 0 0; }
+
+  /* drawer: lives inside the input card and is just a row of it that grows open, upward */
+  .composer.lift .box { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; }
+  .menu {
+    height: 0; overflow: hidden; margin: 0 -16px -12px; padding: 0 8px; scrollbar-width: none;
+    --fade: 0px; --fade-b: 0px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade), #000 calc(100% - 1px - var(--fade-b)), transparent calc(100% - 1px), #000 calc(100% - 1px));
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade), #000 calc(100% - 1px - var(--fade-b)), transparent calc(100% - 1px), #000 calc(100% - 1px));
+    transition: height .28s cubic-bezier(.2, .8, .2, 1), margin .28s cubic-bezier(.2, .8, .2, 1);
+  }
+  .menu.open { margin: -6px -16px 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .menu::-webkit-scrollbar { display: none; }
+  .menu.open.settled { overflow-y: auto; }
+  .menu .sec { padding: 8px 8px 4px; color: var(--muted); }
+  .menu .item {
+    display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: none; text-align: left;
+    padding: 6px 8px; border-radius: 8px; cursor: pointer; color: var(--soft); white-space: nowrap;
+  }
+  .menu .item:hover, .menu .item.on { background: #f0efed; }
+  .menu .item svg { flex: none; color: var(--soft); }
+  .menu .item b { font-weight: 500; color: var(--text); }
+  .menu .item .d { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .menu .item .tag { margin-left: auto; flex: none; border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; font-size: 12px; line-height: 18px; color: var(--soft); }
+
+  /* ---------- "is this the part you mean?" drawer ---------- */
+  .dw { padding: 6px 8px 0; }
+  .dw-q { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 0 8px; color: var(--soft); }
+  .dw-q b { font-weight: 500; color: var(--text); }
+  .dw-n { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dw-q .qp { display: inline-block; max-width: 320px; overflow: hidden; white-space: pre; vertical-align: bottom; transition: max-width .26s cubic-bezier(.2, .8, .2, 1), opacity .18s ease-out; }
+  .dw-q.collapse .qp { max-width: 0; opacity: 0; }
+  .dw-stage { position: relative; height: 132px; border-radius: 8px; border: 1px solid var(--border); background: #fafaf9; overflow: hidden; }
+  .dw-arrow { position: absolute; top: 50%; z-index: 3; width: 26px; height: 26px; margin-top: -13px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: #fff; color: var(--soft); cursor: pointer; transition: background .12s ease, color .12s ease, opacity .12s ease; }
+  .dw-arrow.l { left: 8px; } .dw-arrow.r { right: 8px; }
+  .dw-arrow:hover { background: #f5f5f4; color: var(--text); }
+  /* once an option is chosen the arrows drop away */
+  .dw-arrow.out { opacity: 0; translate: 0 6px; pointer-events: none; transition: opacity .1s ease-out, translate .1s ease-out; }
+  .dw-stage.swap .pv-scale { animation: dw-swap .26s ease-out; }
+  @keyframes dw-swap { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: none; } }
+  /* all the guesses at once: pick one and it's accepted */
+  .dw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-bottom: 8px; }
+  .dw-tile { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 6px; border: 1px solid var(--border); border-radius: 10px; background: #fff; font: inherit; text-align: left; cursor: pointer; transition: background .12s ease, border-color .12s ease; }
+  .dw-tile:hover { background: #f5f5f4; border-color: #c7c4c0; }
+  .dw-tile:focus-visible { outline: 2px solid #0a64ff; outline-offset: 1px; }
+  .dw-tile.cur { border-color: #0a64ff; }
+  .dw-tstage .pv-clone { outline: 0; }
+  .dw-tstage { position: relative; height: 96px; border-radius: 6px; border: 1px solid var(--border); background: #fafaf9; overflow: hidden; }
+  .dw-tl { padding: 0 2px; font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dw-stage.none { display: grid; place-items: center; color: var(--muted); }
+  .pv-scale { position: absolute; left: 50%; top: 50%; transform-origin: 50% 50%; transform: translate(-50%, -50%) scale(var(--s, 1)); transition: transform .3s cubic-bezier(.2, .8, .2, 1); pointer-events: none; }
+  .pv-scale.top { top: 12px; transform-origin: 50% 0; transform: translate(-50%, 0) scale(var(--s, 1)); }
+  .pv-clone { position: relative; flex: none; margin: 0 !important; outline: 1px solid #0a64ff; transition: padding .65s cubic-bezier(.3, .7, .2, 1), width .65s cubic-bezier(.3, .7, .2, 1), gap .65s cubic-bezier(.3, .7, .2, 1); }
+  /* gap preview: each item gets a dashed outline so the space between them reads */
+  .pv-clone.gapview > :not(.pv-pad) { outline: 1px dashed rgba(10,100,255,.5); }
+  /* the overlay carries the same padding as the clone and masks out its content box, leaving only the padding hatched */
+  .pv-clone.live, .pv-pad.live { transition-duration: .1s; }
+  .pv-pad {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit; transition: padding .65s cubic-bezier(.3, .7, .2, 1);
+    background: repeating-linear-gradient(45deg, rgba(10,100,255,.30) 0 3px, rgba(10,100,255,.10) 3px 6px);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+  }
+  .dw-pad { display: flex; flex-direction: column; gap: 2px; padding: 8px 0 0; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .dw-pad .grp { display: flex; }
+  /* padding editor: one line with the four sides, each edited on its own, and a small design-system menu at the end */
+  .dw-pad .line { display: flex; align-items: center; gap: 6px; }
+  .dw-pad .rl { flex: none; width: 48px; font-size: 12px; color: var(--muted); }
+  .dw-pad .rn { font-size: 12px; color: var(--muted); }
+  .dw-pad .slot { flex: 1 1 0; min-width: 0; display: grid; }
+  .dw-pad .slot > * { grid-area: 1 / 1; min-width: 0; align-self: center; transition: opacity .18s ease-out, translate .18s ease-out; }
+  .dw-pad .nums { display: flex; align-items: center; gap: 6px; }
+  .dw-pad .vars { translate: 14px 0; opacity: 0; pointer-events: none; }
+  .dw-pad .slot.vars-on .nums { translate: -14px 0; opacity: 0; pointer-events: none; }
+  .dw-pad .slot.vars-on .vars { translate: 0 0; opacity: 1; pointer-events: auto; }
+  .dw-pad .vars-h { flex: none; display: flex; align-items: center; gap: 4px; padding: 2px 6px; border: 0; border-radius: 6px; background: none; font-size: 12px; line-height: 18px; color: var(--soft); cursor: pointer; transition: background .12s ease; }
+  .dw-pad .vars-h:hover { background: #f5f5f4; }
+  .dw-pad .vars-h svg { flex: none; color: var(--muted); }
+  .dw-pad .vars-h .chev { transition: transform .2s ease; }
+  .dw-pad .vars-h[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .dw-pad .vars-h em { font-style: normal; color: var(--text); }
+  .dw-pad .vars { display: flex; align-items: center; gap: 4px; }
+  .dw-pad .vars button { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 3px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: #f5f5f4; color: var(--muted); font-size: 10px; line-height: 16px; white-space: nowrap; overflow: hidden; cursor: pointer; transition: background .12s ease, color .12s ease; }
+  .dw-pad .vars button b { font-weight: 500; font-size: 12px; color: var(--text); }
+  .dw-pad .vars button:hover { background: #e7e5e4; }
+  .dw-pad .vars button.on { background: #e6eeff; color: #2563eb; }
+  .dw-pad .vars button.on b { color: #2563eb; }
+  .dw-pad .new .grp { flex: none; gap: 3px; border-radius: 6px; transition: gap .1s ease-out, box-shadow .12s ease; color: #2563eb; font-weight: 500; }
+  .dw-pad .new .cell {
+    flex: none; width: 24px; overflow: hidden; line-height: 20px; text-align: center; display: block; border-radius: 6px; background: #e6eeff;
+    cursor: text; transition: box-shadow .12s ease;
+  }
+  .dw-pad .new .cell:hover, .dw-pad .new .cell:focus-within { box-shadow: inset 0 0 0 1px #2563eb; }
+  .dw-pad .cell input { display: block; width: 100%; border: 0; outline: none; background: none; color: inherit; text-align: center; cursor: inherit; user-select: text; -moz-appearance: textfield; appearance: textfield; }
+  .dw-pad .cell input:focus { cursor: text; }
+  .dw-pad .cell input::-webkit-inner-spin-button, .dw-pad .cell input::-webkit-outer-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
+  .dw-foot { display: flex; gap: 6px; padding: 0 0 8px; }
+  .dw-foot .ask-btn { flex: 1 1 0; min-width: 0; text-align: center; }
+  .dw-foot[hidden] { display: none; }
+  .ask-btn {
+    border: 0; background: none; color: var(--soft); cursor: pointer; padding: 2px 10px; border-radius: 8px;
+    transition: background .12s ease, color .12s ease, opacity .12s ease;
+  }
+  .ask-btn:hover:not(:disabled) { background: #e7e5e4; color: var(--text); }
+  .ask-btn.primary { padding: 6px 14px; border: 1px solid var(--border); background: #fff; }
+  .ask-btn.plain { padding: 6px 14px; border: 1px solid var(--border); background: #fff; }
+
+  .box {
+    display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--border);
+    border-radius: 16px; padding: 14px 16px 10px 16px; background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 14px rgba(0,0,0,.04); transition: border-color .12s, box-shadow .3s ease;
+  }
+  /* drawer open: a soft shadow fades in behind the card */
+  .composer:has(.menu.open) .box { box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 32px rgba(0,0,0,.10), 0 2px 10px rgba(0,0,0,.05); }
+  .box:focus-within { border-color: #c7c4c0; }
+  .field { display: flex; align-items: flex-start; gap: 6px; }
+  .chip { flex: none; height: 22px; padding: 0 8px; border-radius: 6px; line-height: 22px; font-weight: 500; color: var(--c); background: var(--bg-c); user-select: none; }
+  /* the input is a contenteditable, so highlights are real inline elements with real padding: nothing is faked, and
+     ordinary word spacing is untouched */
+  .ta { position: relative; flex: 1 1 0; min-width: 0; }
+  #input {
+    display: block; width: 100%; min-height: 22px; max-height: 110px; overflow-y: auto; outline: none; font-size: 14px; line-height: 22px;
+    white-space: pre-wrap; overflow-wrap: break-word; color: var(--text); cursor: text; scrollbar-width: none;
+    user-select: text; -webkit-user-select: text;
+  }
+  #input::-webkit-scrollbar { display: none; }
+  #input:empty::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+  .bar { display: flex; align-items: center; justify-content: space-between; }
+  .bar-side { display: flex; align-items: center; gap: 0; }
+  .bar-side:first-child { margin-left: -6px; }
+  .bar .tool, .bar .auto {
+    border: 0; background: none; color: var(--soft); cursor: pointer; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+    transition: background .12s ease, color .12s ease;
+  }
+  .bar .tool { width: 24px; height: 24px; }
+  .bar .auto { height: 24px; padding: 0 6px 0 10px; }
+  .bar svg :is(path, rect) { vector-effect: non-scaling-stroke; stroke-width: 1.5px; }
+  .bar .tool.on { background: #f0efed; color: var(--text); }
+  .bar .tool:hover, .bar .auto:hover { background: #f0efed; color: var(--text); }
+  #send {
+    flex: none; width: 32px; height: 32px; margin-left: 4px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--text); color: #fff; display: grid; place-items: center; transition: background .12s ease;
+  }
+  #send:disabled { background: #a8a29e; cursor: default; }
+
+  /* the wireframe eases whenever the chat changes it */
+  [data-el] { transition: padding .6s cubic-bezier(.3, .7, .2, 1); }
+  .wire [data-el].flash { outline: 2px solid #0a64ff; outline-offset: 2px; }
+
+  /* the wireframe is only kept so the drawer can preview its parts; it is never shown */
+  .wire { visibility: hidden; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="wire" aria-hidden="true">
+  <div class="w-chrome" data-el="chrome">
+    <div class="w-tabs" data-el="tabs"><span class="on">Preview</span><span>Screens</span><span>Code</span></div>
+    <div class="w-url" data-el="url">/index</div>
+    <div class="w-device">iPad 11"</div>
+  </div>
+  <div class="w-body">
+    <div class="w-app">
+      <div class="w-head" data-el="header">
+        <i class="w-logo" data-el="logo">A</i><span class="w-title">Untitled project</span>
+        <span class="w-spacer"></span>
+        <div class="w-pills" data-el="topbtns"><span class="w-btn">Share</span><span class="w-btn">Export</span><span class="w-btn">Preview</span><span class="w-btn dark">Publish</span></div>
+      </div>
+      <div class="w-main">
+        <div class="w-canvas" data-el="canvas">
+          <div class="w-art" data-el="art"><i class="w-ring" style="left:12%;top:20%"></i><i class="w-ring" style="left:78%;top:14%"></i><i class="w-ring" style="left:9%;top:78%"></i><i class="w-ring" style="left:56%;top:74%"></i></div>
+          <div class="w-cap">Hero image · 1280 × 720</div>
+        </div>
+        <div class="w-panel" data-el="panel">
+          <div class="w-sec" data-el="layers">
+            <div class="w-h">Layers <span>4</span></div>
+            <div class="w-layer on"><i></i>Hero image<em>Image</em></div>
+            <div class="w-layer"><i></i>Headline<em>Text</em></div>
+            <div class="w-layer"><i></i>Subtitle<em>Text</em></div>
+            <div class="w-layer"><i></i>Get started<em>Button</em></div>
+            <div class="w-add" data-el="add">+ Add layer</div>
+          </div>
+          <div class="w-sec" data-el="props">
+            <div class="w-h">Properties</div>
+            <div class="w-row" data-el="fields"><div class="w-field"><span>X</span>24</div><div class="w-field"><span>Y</span>48</div></div>
+            <div class="w-seg" data-el="seg"><span>Left</span><span>Center</span><span>Right</span><span>Fill</span></div>
+            <div class="w-slide" data-el="slider1"><div><span>Opacity</span><b>80%</b></div><div class="w-slider"><i style="width:80%"></i><b style="left:calc(80% - 5px)"></b></div></div>
+            <div class="w-slide" data-el="slider2"><div><span>Blur</span><b>20%</b></div><div class="w-slider"><i style="width:20%"></i><b style="left:calc(20% - 5px)"></b></div></div>
+          </div>
+          <div class="w-sec" data-el="presets">
+            <div class="w-h">Presets</div>
+            <div class="w-presets" data-el="tiles"><span>Soft</span><span>Bold</span><span>Mono</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="app">
+  <div class="list" id="list">
+    <div class="msg user">i want to build a chat box that notices when i'm talking about a part of the ui and highlights it as i type</div>
+    <div class="msg ai">Good idea. I'd match phrases like “header” or “side panel” against a list of the parts of the UI, then wrap each match in a highlight inside the input. Do you want it to guess when a phrase could mean more than one thing?</div>
+    <div class="msg user">yeah, if it's vague it should ask me. like hovering the word opens a little drawer that says are you talking about the right panel</div>
+    <div class="msg ai">Done. Vague phrases get an <mark class="amb">orange</mark> highlight. Hover one and a drawer slides up from the input with a preview and a <b>Yes</b> / <b>No</b>. <b>No</b> moves on to the next best guess.</div>
+    <div class="msg user">nice. when i hit yes it should swap the word for the real name and the drawer should stay open</div>
+    <div class="msg ai">Yes now rewrites the phrase to <mark class="ok">Right panel</mark> and the drawer stays on a “text updated” confirmation until you click away or keep typing.</div>
+    <div class="msg user">can the drawer show what the padding actually looks like? like if i say 12px of padding on the panel</div>
+    <div class="msg ai">It does now. Numbers next to “padding” get a <mark class="pad">blue</mark> highlight, and the drawer shows the part with the padding hatched. You can edit the number in the drawer or drag sideways on it to scrub, and the message text updates with it.</div>
+    <div class="msg user">love it. when a highlight appears let's make the letters do a quick wave and fade the background in</div>
+    <div class="msg ai">Added. Each letter hops up 3px in a quick wave while the background fades in. You can keep typing through it without the caret moving.</div>
+    <div class="msg user">the bold text should match the weight of the slash menu chips</div>
+    <div class="msg ai">Matched. Highlights are now weight 500, the same as the chips.</div>
+    <div class="empty">
+      <span>Try one of these, then hover the highlights</span>
+      <button type="button">make the top bar feel less cramped, maybe 16px of padding</button>
+      <button type="button">add 12px padding to the side panel</button>
+      <button type="button">the buttons need padding of 8</button>
+      <button type="button">put an 8px gap between the preset tiles</button>
+    </div>
+  </div>
+  <section class="chat">
+    <form class="composer" id="composer">
+      <div class="box">
+        <div class="menu" id="menu" role="menu" aria-hidden="true"></div>
+        <div class="field" id="field"><div class="ta"><div id="input" contenteditable="plaintext-only" role="textbox" aria-multiline="true" aria-label="Message" data-placeholder="Describe a change to the UI" spellcheck="false"></div></div></div>
+        <div class="bar">
+          <div class="bar-side">
+            <button class="tool" type="button" tabindex="-1" aria-label="Add"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 12H12M18 12H12M12 12V6M12 12V18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button class="tool" id="slash" type="button" tabindex="-1" aria-label="Commands"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 4L8 20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+          </div>
+          <div class="bar-side">
+            <button class="auto" type="button" tabindex="-1">Auto <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button class="tool" type="button" tabindex="-1" aria-label="Voice"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="12" rx="3" stroke="currentColor" stroke-width="1.5"></rect><path d="M5 10V11C5 14.866 8.13401 18 12 18V18V18C15.866 18 19 14.866 19 11V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M12 18V22M12 22H9M12 22H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+            <button id="send" type="submit" disabled aria-label="Send"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 19V5M6 11L12 5L18 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+const inputEl = $('#input'), sendEl = $('#send'), listEl = $('#list'), menuEl = $('#menu'), slashEl = $('#slash');
+const composerEl = $('#composer');
+
+/* ---------- the input: a plain-text contenteditable that answers like a textarea ---------- */
+function offsetAt(node, o) {
+  const r = document.createRange();
+  r.selectNodeContents(inputEl);
+  r.setEnd(node, o);
+  return r.toString().length;
+}
+function getSel() {
+  const s = getSelection();
+  if (!s.rangeCount || !inputEl.contains(s.anchorNode) || !inputEl.contains(s.focusNode)) return null;
+  const r = s.getRangeAt(0);
+  return [offsetAt(r.startContainer, r.startOffset), offsetAt(r.endContainer, r.endOffset)];
+}
+function pointAt(off) {
+  const w = document.createTreeWalker(inputEl, NodeFilter.SHOW_TEXT);
+  let n, acc = 0, last = null;
+  while ((n = w.nextNode())) {
+    if (off <= acc + n.data.length) return [n, off - acc];
+    acc += n.data.length; last = n;
+  }
+  return last ? [last, last.data.length] : [inputEl, inputEl.childNodes.length];
+}
+function setSel(a, b = a) {
+  const [n1, o1] = pointAt(a), [n2, o2] = pointAt(b);
+  const r = document.createRange();
+  r.setStart(n1, o1); r.setEnd(n2, o2);
+  const s = getSelection();
+  s.removeAllRanges(); s.addRange(r);
+}
+let caretMem = 0;
+Object.defineProperties(inputEl, {
+  value: { get: () => inputEl.textContent, set: v => { inputEl.textContent = v; } },
+  selectionStart: { get: () => (getSel() || [inputEl.textContent.length])[0] },
+  selectionEnd: { get: () => (getSel() || [0, inputEl.textContent.length])[1] },
+});
+inputEl.setRangeText = (t, a, b) => {
+  const v = inputEl.value;
+  inputEl.value = v.slice(0, a) + t + v.slice(b);
+  caretMem = a + t.length;
+  if (document.activeElement === inputEl) setSel(caretMem); // placing a selection in here would steal focus from the drawer's own fields
+};
+inputEl.setSelectionRange = (a, b) => setSel(a, b);
+
+/* ---------- the parts of the wireframe the chat can talk about ---------- */
+// fixed: the element has a set height in CSS, so padding eats into it rather than growing it
+const EL = {
+  header:  { label: 'Header bar', fixed: true },
+  chrome:  { label: 'Browser toolbar' },
+  tabs:    { label: 'Mode tabs' },
+  url:     { label: 'URL bar', fixed: true },
+  logo:    { label: 'Logo', fixed: true },
+  topbtns: { label: 'Header buttons' },
+  canvas:  { label: 'Canvas', fixed: true },
+  art:     { label: 'Artboard', fixed: true },
+  panel:   { label: 'Right panel' },
+  layers:  { label: 'Layers list' },
+  props:   { label: 'Properties section' },
+  presets: { label: 'Presets section' },
+  add:     { label: 'Add button', fixed: true },
+  fields:  { label: 'Input fields' },
+  seg:     { label: 'Segmented control' },
+  slider1: { label: 'Opacity slider' },
+  slider2: { label: 'Blur slider' },
+  tiles:   { label: 'Preset tiles' },
+};
+for (const [id, e] of Object.entries(EL)) { e.id = id; e.node = $(`[data-el="${id}"]`); }
+const BY_LABEL = Object.fromEntries(Object.values(EL).map(e => [e.label, e]));
+
+// vague words, each with the parts it could mean, most likely first
+const LEX = [
+  [/\b(?:top ?bar|header|nav ?bar|navigation|nav|app bar)\b/gi, ['header', 'chrome', 'tabs', 'topbtns', 'logo']],
+  [/\btoolbar\b/gi, ['chrome', 'header', 'tabs']],
+  [/\b(?:add|plus|new) button\b/gi, ['add', 'topbtns']],
+  [/\b(?:buttons?|pills?|chips?)\b/gi, ['topbtns', 'add', 'tiles', 'seg']],
+  [/\b(?:side ?bar|side panel|right panel|right side|panel|inspector)\b/gi, ['panel', 'props', 'layers', 'presets']],
+  [/\b(?:images?|pictures?|photos?|art ?board|artwork|illustration|graphic|hero)\b/gi, ['art', 'canvas']],
+  [/\b(?:canvas|main area|workspace|stage|preview)\b/gi, ['canvas', 'art']],
+  [/\b(?:layers?|list|items|rows)\b/gi, ['layers', 'props']],
+  [/\b(?:sliders?|scrubber|range)\b/gi, ['slider1', 'slider2']],
+  [/\b(?:inputs?|fields?|text ?boxes?|dropdowns?|forms?)\b/gi, ['fields', 'url']],
+  [/\b(?:tabs?|switcher|toggles?|segments?)\b/gi, ['tabs', 'seg']],
+  [/\b(?:logo|icon|brand|avatar)\b/gi, ['logo']],
+  [/\b(?:url|address ?bar|search ?bar|link)\b/gi, ['url']],
+  [/\b(?:sections?|cards?|groups?|blocks?|areas?|boxe?s?|container)\b/gi, ['props', 'layers', 'presets', 'panel']],
+  [/\b(?:presets?|templates?|thumbnails?|tiles?|swatches)\b/gi, ['tiles', 'presets']],
+];
+
+/* ---------- reading the text ---------- */
+const guess = {}; // phrase key -> how many guesses were rejected
+let els = [], pads = [];
+
+function analyze(text) {
+  const out = [];
+  const free = (s, e) => !out.some(m => s < m.end && e > m.start);
+  for (const m of text.matchAll(/\[([^\]\n]+)\]/g)) {
+    const e = BY_LABEL[m[1]];
+    if (e) out.push({ start: m.index, end: m.index + m[0].length, text: m[0], state: 'ok', id: e.id, cands: [e.id] });
+  }
+  const hits = [];
+  LEX.forEach(([re, cands]) => { for (const m of text.matchAll(re)) hits.push({ start: m.index, end: m.index + m[0].length, text: m[0], cands }); });
+  hits.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+  // words side by side ("preset tiles", "header buttons") are one phrase, not two: join them, keeping the guesses they agree on
+  const phrases = [];
+  hits.forEach(h => {
+    const last = phrases[phrases.length - 1];
+    if (last && h.start >= last.end && /^[ \t]+$/.test(text.slice(last.end, h.start))) {
+      const both = h.cands.filter(c => last.cands.includes(c));
+      Object.assign(last, { end: h.end, text: text.slice(last.start, h.end), cands: both.length ? both : h.cands });
+    } else phrases.push({ ...h });
+  });
+  phrases.forEach(h => { if (free(h.start, h.end)) out.push({ ...h, state: 'amb' }); });
+  out.sort((a, b) => a.start - b.start);
+  const seen = {};
+  out.forEach(m => {
+    const base = m.text.toLowerCase();
+    m.key = base + '#' + (seen[base] = (seen[base] ?? -1) + 1);
+    if (m.state === 'amb') { m.idx = guess[m.key] || 0; m.id = m.cands[m.idx] ?? null; }
+  });
+
+  // "12px padding", "padding to 12", "8 px of padding"
+  const found = [];
+  // one to four numbers, read like CSS shorthand: "12", "8 16", "8 16 12", "8 16 12 4"
+  const NUM = String.raw`(\d+(?:\.\d+)?(?:(?:\s*px)?\s+\d+(?:\.\d+)?){0,3})`;
+  const re1 = new RegExp(NUM + String.raw`(?:\s*(?:px|pixels?))?\s+(?:of\s+)?(?:(?:extra|more)\s+)?padding\b`, 'gid');
+  const re2 = new RegExp(String.raw`\bpadding(?:\s+(?:of|to|by|at|from|is|=|:))?\s*` + NUM + String.raw`(?:\s*(?:px|pixels?))?`, 'gid');
+  for (const re of [re1, re2]) for (const m of text.matchAll(re)) {
+    const s = m.index, e = s + m[0].length;
+    if (found.some(f => s < f.end && e > f.start) || out.some(o => s < o.end && e > o.start)) continue;
+    const n = m[1].match(/\d+(?:\.\d+)?/g).map(x => Math.min(parseFloat(x), 200));
+    const vals = n.length === 1 ? [n[0], n[0], n[0], n[0]] : n.length === 2 ? [n[0], n[1], n[0], n[1]] : n.length === 3 ? [n[0], n[1], n[2], n[1]] : n;
+    found.push({ start: s, end: e, numStart: m.indices[1][0], numEnd: m.indices[1][1], vals, value: vals[0] });
+  }
+  // "12px gap", "gap of 8", "8 spacing": one number, the space between the items inside a part
+  const GN = String.raw`(\d+(?:\.\d+)?)`;
+  const rg1 = new RegExp(GN + String.raw`(?:\s*(?:px|pixels?))?\s+(?:of\s+)?(?:(?:extra|more)\s+)?(?:gaps?|spacing)\b`, 'gid');
+  const rg2 = new RegExp(String.raw`\b(?:gaps?|spacing)(?:\s+(?:of|to|by|at|from|is|=|:))?\s*` + GN + String.raw`(?:\s*(?:px|pixels?))?`, 'gid');
+  for (const re of [rg1, rg2]) for (const m of text.matchAll(re)) {
+    const s = m.index, e = s + m[0].length;
+    if (found.some(f => s < f.end && e > f.start) || out.some(o => s < o.end && e > o.start)) continue;
+    const v = Math.min(parseFloat(m[1]), 200);
+    found.push({ kind: 'gap', start: s, end: e, numStart: m.indices[1][0], numEnd: m.indices[1][1], vals: [v], value: v });
+  }
+  const ps = [];
+  found.forEach(p => {
+    let best = null, bd = Infinity;
+    out.forEach(o => { const d = Math.max(0, p.start - o.end, o.start - p.end); if (d < bd) { bd = d; best = o; } });
+    if (best) ps.push({ ...p, key: best.key });
+  });
+  return { els: out, pads: ps.sort((a, b) => a.start - b.start) };
+}
+
+function marksHtml(text, a, onlyKnown = false, hotKey = null) {
+  const segs = [];
+  a.els.forEach(m => { if (!onlyKnown || m.state === 'ok') segs.push({ ...m, cls: m.state === 'ok' ? 'ok' : 'amb' }); });
+  a.pads.forEach(p => { if (!a.els.some(m => p.start < m.end && p.end > m.start)) segs.push({ ...p, cls: 'pad' }); });
+  segs.sort((x, y) => x.start - y.start);
+  let html = '', pos = 0;
+  segs.forEach(s => {
+    if (s.start < pos) return;
+    const hot = hotKey && s.key === hotKey ? ' hot' : '';
+    html += esc(text.slice(pos, s.start)) + `<mark class="${s.cls}${hot}" data-k="${esc(s.key)}">${esc(text.slice(s.start, s.end))}</mark>`;
+    pos = s.end;
+  });
+  return html + esc(text.slice(pos));
+}
+
+// highlights seen on the last paint (class + key): one that wasn't there before has just appeared and gets the wave
+let seenMarks = new Set(), popT = 0;
+const waving = new Map(); // sig -> when its wave started; an edit rebuilds the DOM, so a running wave is resumed from here
+const WAVE_MS = 50 + 160;
+const markSig = m => m.className.replace(/\b(hot|pop)\b/g, '').trim() + '|' + m.dataset.k;
+function unwave() {
+  clearTimeout(popT);
+  waving.clear();
+  const sel = document.activeElement === inputEl ? getSel() : null;
+  inputEl.querySelectorAll('mark.pop').forEach(m => { m.classList.remove('pop'); m.removeAttribute('style'); m.textContent = m.textContent; });
+  if (sel) setSel(sel[0], sel[1]);
+}
+// start (or, with elapsed > 0, pick up mid-way) the wave on these highlights
+function wave(marks, elapsed = 0) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  marks.forEach(m => {
+    const text = m.textContent, n = text.replace(/\s/g, '').length;
+    let i = 0;
+    m.replaceChildren(...text.split(/(\s+)/).map(w => {
+      if (!w || /^\s+$/.test(w)) return document.createTextNode(w);
+      const wd = el('span', 'wd');
+      for (const ch of w) {
+        const lt = el('span', 'lt', ch);
+        lt.style.setProperty('--d', ((n > 1 ? i++ / (n - 1) * 50 : 0) - elapsed).toFixed(1) + 'ms'); // negative = already under way
+        wd.append(lt);
+      }
+      return wd;
+    }));
+    m.style.animationDelay = -elapsed + 'ms';
+    m.classList.add('pop');
+  });
+}
+function paint() {
+  const t = inputEl.value;
+  let html = marksHtml(t, { els, pads }, false, dw ? dw.key : null);
+  if (t.endsWith('\n')) html += '<br>'; // a trailing newline needs something after it to show
+  if (!t) { if (inputEl.innerHTML) inputEl.innerHTML = ''; seenMarks = new Set(); return; }
+  let cur = inputEl.innerHTML;
+  if (inputEl.querySelector('mark.pop')) { // mid-wave: compare against what the DOM would be without the letter wrappers
+    const c = inputEl.cloneNode(true);
+    c.querySelectorAll('mark.pop').forEach(m => { m.classList.remove('pop'); m.removeAttribute('style'); m.textContent = m.textContent; });
+    cur = c.innerHTML;
+  }
+  if (cur === html) return; // already right: leave the caret and undo history alone
+  const sel = document.activeElement === inputEl ? getSel() : null;
+  inputEl.innerHTML = html;
+  if (sel) setSel(sel[0], sel[1]);
+  const marks = [...inputEl.querySelectorAll('mark')];
+  const fresh = marks.filter(m => !seenMarks.has(markSig(m)));
+  seenMarks = new Set(marks.map(markSig));
+  const now = performance.now();
+  [...waving].forEach(([k, t]) => { if (now - t >= WAVE_MS) waving.delete(k); });
+  marks.forEach(m => {
+    const k = markSig(m);
+    if (fresh.includes(m)) waving.set(k, now);
+    if (waving.has(k)) wave([m], now - waving.get(k));
+  });
+  if (sel) setSel(sel[0], sel[1]); // wrapping the letters replaced the text nodes the caret was in
+  clearTimeout(popT);
+  if (waving.size) popT = setTimeout(unwave, WAVE_MS - Math.min(...[...waving.values()].map(t => now - t)) + 60);
+}
+
+function refresh() {
+  const a = analyze(inputEl.value);
+  els = a.els; pads = a.pads;
+  sendEl.disabled = !inputEl.value.trim();
+  paint();
+  syncCaret();
+  // the drawer may be open with nobody hovering or holding the caret (e.g. typing in its own number field)
+  if (pinned && dw && isOpen()) { updatePad(padOf(dw.key)); updateGap(gapOf(dw.key)); } // confirmation is showing: keep its preview following the numbers
+  else if (dw && mode === 'mark' && isOpen() && findEl(dw.key)) showMark(dw.key);
+  sync();
+}
+
+/* ---------- drawer plumbing (the same drawer the "/" button opens) ---------- */
+let mode = null; // 'cmd' | 'mark'
+let menuTimer = 0;
+function updateMenuFade(h = menuEl.clientHeight) {
+  const below = menuEl.scrollHeight - menuEl.scrollTop - h;
+  menuEl.style.setProperty('--fade', Math.min(menuEl.scrollTop, 40) + 'px');
+  menuEl.style.setProperty('--fade-b', '0px'); // no fade along the bottom edge
+}
+menuEl.addEventListener('scroll', () => updateMenuFade(), { passive: true });
+function setMenu(open) {
+  clearTimeout(menuTimer);
+  if (!open) { pinned = false; varsOpen = {}; } // the design-system dropdown always starts closed
+  menuEl.setAttribute('aria-hidden', String(!open));
+  menuEl.classList.remove('settled');
+  if (open) {
+    composerEl.style.height = composerEl.offsetHeight + 'px';
+    composerEl.classList.add('lift');
+    menuEl.scrollTop = 0;
+    menuEl.classList.add('open');
+    const h = Math.min(menuEl.scrollHeight + 1, mode === 'mark' ? Infinity : 320);
+    menuEl.style.height = h + 'px';
+    updateMenuFade(h - 1);
+    menuTimer = setTimeout(() => menuEl.classList.add('settled'), 300);
+  } else {
+    menuEl.classList.remove('open');
+    menuEl.style.height = '0px';
+    menuTimer = setTimeout(() => {
+      composerEl.classList.remove('lift');
+      composerEl.style.height = '';
+      if (!menuEl.classList.contains('open')) { mode = null; stopAnim(); }
+    }, 300);
+  }
+}
+// the drawer changed content while open: animate to the new height
+function fitMenu() {
+  if (!menuEl.classList.contains('open')) return;
+  const cur = menuEl.style.height;
+  menuEl.style.transition = 'none'; menuEl.style.height = 'auto';
+  const h = Math.min(menuEl.scrollHeight + 1, mode === 'mark' ? Infinity : 320);
+  menuEl.style.height = cur; void menuEl.offsetHeight;
+  menuEl.style.transition = ''; menuEl.style.height = h + 'px';
+  updateMenuFade(h - 1);
+}
+const isOpen = () => menuEl.classList.contains('open');
+
+/* ---------- "/" commands ---------- */
+const MENU = [
+  ['Chat Mode', ['#2563eb', '#eff4ff'], [
+    ['Ask', 'Discuss without making any changes.', 'M5 5h14v10H10l-4 4v-4H5z'],
+    ['Plan', 'Brainstorm & create a plan.', 'M7 4h7l4 4v12H7zM14 4v4h4M10 12h5M10 16h5'],
+  ]],
+  ['Skills', ['#ea580c', '#fff3ea'], [
+    ['Inspiration', 'Explore variants of an idea.', 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z', 'System'],
+    ['Debug', 'Find and fix a bug.', 'M9 8a3 3 0 016 0v1H9zM7 9h10v6a5 5 0 01-10 0zM12 9v11M3 12h4M17 12h4M4 7l3 2M20 7l-3 2', 'System'],
+    ['Polish', 'Improve & tidy up the design.', 'M3 9h18v6H3zM7 9v3M11 9v2M15 9v3M19 9v2', 'System'],
+  ]],
+  ['Context', ['#ea580c', '#fff3ea'], [
+    ['Clear', 'Clear the chat, start fresh (20% full)', 'M4 16l9-9a2 2 0 013 0l3 3a2 2 0 010 3l-6 6H8zM8 20h12M9 11l5 5'],
+  ]],
+];
+const cmdView = el('div');
+MENU.forEach(([title, [fg, wash], items]) => {
+  cmdView.append(el('div', 'sec', title));
+  items.forEach(([name, desc, d, tag]) => {
+    const b = el('button', 'item');
+    b.type = 'button';
+    b.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg><b>${name}</b><span class="d">${desc}</span>` + (tag ? `<span class="tag">${tag}</span>` : '');
+    b.addEventListener('click', () => { setMenu(false); setChip('/' + name, fg, wash); refresh(); inputEl.focus(); });
+    cmdView.append(b);
+  });
+});
+let chipEl = null, chipCmd = '';
+function setChip(cmd, fg, wash) {
+  if (!chipEl) { chipEl = el('span', 'chip'); $('#field').prepend(chipEl); }
+  chipEl.textContent = chipCmd = cmd;
+  chipEl.style.setProperty('--c', fg);
+  chipEl.style.setProperty('--bg-c', wash);
+}
+function clearChip() { if (chipEl) chipEl.remove(); chipEl = null; chipCmd = ''; }
+slashEl.addEventListener('click', () => {
+  if (isOpen() && mode === 'cmd') { setMenu(false); return; }
+  stopAnim(); dw = null; paint();
+  menuEl.replaceChildren(cmdView);
+  mode = 'cmd';
+  if (isOpen()) fitMenu(); else setMenu(true);
+});
+
+/* ---------- the "which part do you mean?" drawer ---------- */
+let dw = null; // what the drawer is showing right now
+let hoverKey = null, caretKey = null, dismissed = null, overMenu = false;
+let openT = 0, closeT = 0;
+let pinned = false; // after "Yes" the drawer stays open on its confirmation until dismissed or the user types
+
+const findEl = key => els.find(m => m.key === key);
+const padOf = key => pads.find(p => p.key === key && p.kind !== 'gap');
+const gapOf = key => pads.find(p => p.key === key && p.kind === 'gap');
+const fmtPad = (t, r, b, l) => t === r && r === b && b === l ? `${t}` : t === b && l === r ? `${t} ${r}` : `${t} ${r} ${b} ${l}`;
+
+function stopAnim() { if (dw) { clearTimeout(dw.t0); clearInterval(dw.timer); } }
+
+function sync() {
+  clearTimeout(openT); clearTimeout(closeT);
+  if (pinned || document.body.classList.contains('resizing') || (mode === 'cmd' && isOpen())) return; // dragging the resize handle must not close it
+  const want = hoverKey || caretKey;
+  if (want !== dismissed) dismissed = want ? dismissed : null;
+  if (want && want !== dismissed && findEl(want)) {
+    if (dw && dw.key === want && isOpen()) { showMark(want); return; }
+    openT = setTimeout(() => showMark(want), isOpen() ? 0 : 150);
+  } else if (!want && mode === 'mark' && isOpen() && !overMenu) {
+    closeT = setTimeout(closeMark, 320);
+  }
+}
+function closeMark() { if (mode === 'mark') { setMenu(false); if (dw) { stopAnim(); const k = dw.key; dw = null; paint(); } } }
+menuEl.addEventListener('pointerenter', () => { overMenu = true; clearTimeout(closeT); });
+menuEl.addEventListener('pointerleave', () => { overMenu = false; sync(); });
+
+inputEl.addEventListener('pointermove', e => {
+  const m = e.target.closest && e.target.closest('mark');
+  const k = m ? m.dataset.k : null;
+  if (k !== hoverKey) { hoverKey = k; sync(); }
+});
+inputEl.addEventListener('pointerleave', () => { hoverKey = null; sync(); });
+
+function syncCaret() {
+  const s = inputEl.selectionStart, e = inputEl.selectionEnd;
+  const p = document.activeElement === inputEl && s === e ? pads.find(p => s >= p.start && s <= p.end) : null;
+  caretKey = p ? p.key : null;
+}
+['keyup', 'click', 'focus', 'blur'].forEach(t => inputEl.addEventListener(t, () => { syncCaret(); sync(); }));
+document.addEventListener('selectionchange', () => { if (document.activeElement === inputEl) { syncCaret(); sync(); } });
+
+function showMark(key, swap = false) {
+  const m = findEl(key);
+  if (!m) { closeMark(); return; }
+  const pad = padOf(key), gap = gapOf(key);
+  const sig = `${m.id}|${m.state}|${pad ? 1 : 0}|${gap ? 1 : 0}|${m.idx}`;
+  if (dw && dw.key === key && dw.sig === sig && mode === 'mark' && isOpen()) { updatePad(pad); updateGap(gap); return; }
+  swap = swap || !!(dw && dw.swapNext);
+  stopAnim();
+  dw = { key, sig };
+  const was = isOpen();
+  const prev = swap && was ? menuEl.querySelector('.pv-scale') : null; // "No": only the preview slides: the old one leaves left, the new one comes in from the right
+  const root = buildDrawer(m, pad, false);
+  menuEl.replaceChildren(root);
+  if (prev && dw.scale) slideSwap(prev, dw.scale, dw.stage);
+  mode = 'mark';
+  paint();
+  dw.grid ? fitGrid() : fitStage();
+  if (dw.pad || dw.gap !== undefined) startAnim();
+  if (was) fitMenu(); else setMenu(true);
+}
+
+function slideSwap(prev, next, stage) {
+  const w = ((stage.clientWidth || 360) + 40) * swapDir; // far enough to be fully clipped by the stage
+  const opts = { duration: 220, easing: 'cubic-bezier(.2, .8, .2, 1)', fill: 'both' };
+  prev.style.pointerEvents = 'none';
+  stage.append(prev);
+  // the individual `translate` property composes with the centring transform instead of replacing it
+  prev.animate([{ translate: '0 0' }, { translate: -w + 'px 0' }], opts).finished.then(() => prev.remove());
+  next.animate([{ translate: w + 'px 0' }, { translate: '0 0' }], opts);
+}
+
+function buildDrawer(m, pad, swap) {
+  const root = el('div', 'dw');
+  const q = el('div', 'dw-q');
+  const e = m.id ? EL[m.id] : null;
+  const amb = m.state === 'amb';
+  const left = el('span');
+  const grid = false; // one guess at a time (the side-by-side grid of every guess is switched off)
+  dw.grid = grid;
+  if (grid) left.innerHTML = `Which part do you mean by “<b>${esc(m.text)}</b>”?`;
+  else if (!e) left.innerHTML = `I'm out of guesses for “<b>${esc(m.text)}</b>”.`;
+  else if (amb) left.innerHTML = `<span class="qp">Are you talking about the </span><b>${esc(e.label)}</b><span class="qp">?</span>`;
+  else left.innerHTML = `<b>${esc(e.label)}</b>`;
+  q.append(left);
+  if (amb && e && !grid) q.append(el('span', 'dw-n', `${m.idx + 1} of ${m.cands.length}`));
+  root.append(q);
+  dw.q = q;
+
+  if (grid) {
+    const g = el('div', 'dw-grid');
+    dw.tiles = [];
+    m.cands.forEach((id, i) => {
+      const ce = EL[id];
+      if (!ce) return;
+      const src = ce.node, cs = getComputedStyle(src);
+      const clone = src.cloneNode(true);
+      clone.removeAttribute('data-el');
+      clone.querySelectorAll('[data-el]').forEach(n => n.removeAttribute('data-el'));
+      clone.classList.add('pv-clone');
+      clone.style.width = src.offsetWidth + 'px';
+      clone.style.display = cs.display;
+      clone.style.height = ce.fixed ? src.offsetHeight + 'px' : '';
+      const scale = el('div', 'pv-scale');
+      scale.append(clone);
+      const ts = el('div', 'dw-tstage');
+      ts.append(scale);
+      const tile = el('button', 'dw-tile' + (i === m.idx ? ' cur' : ''));
+      tile.type = 'button';
+      tile.append(ts, el('div', 'dw-tl', ce.label));
+      tile.addEventListener('click', () => pick(m.key, i));
+      g.append(tile);
+      dw.tiles.push({ ts, scale, W: src.offsetWidth, H: src.offsetHeight });
+    });
+    root.append(g);
+    return root;
+  }
+
+  const stage = el('div', 'dw-stage' + (swap ? ' swap' : ''));
+  dw.stage = stage;
+  if (!e) {
+    stage.classList.add('none');
+    stage.style.height = stageNeed(m.cands, menuEl.clientWidth - 16 - 28) + 'px'; // same height as the previews it replaces
+    stage.textContent = 'Try describing it another way.';
+  } else {
+    const src = e.node, cs = getComputedStyle(src);
+    const W = src.offsetWidth, H = src.offsetHeight;
+    const side = ['Top', 'Right', 'Bottom', 'Left'].map(s => parseFloat(cs['padding' + s]));
+    const clone = src.cloneNode(true);
+    clone.removeAttribute('data-el');
+    clone.querySelectorAll('[data-el]').forEach(n => n.removeAttribute('data-el'));
+    clone.classList.add('pv-clone');
+    clone.style.width = W + 'px';
+    clone.style.display = cs.display;
+    clone.style.height = e.fixed ? H + 'px' : '';
+    const orig = side.map(n => n + 'px').join(' ');
+    clone.style.padding = orig;
+    const scale = el('div', 'pv-scale');
+    scale.append(clone);
+    Object.assign(dw, { W, H, clone, scale, orig, side, fixed: !!e.fixed, cands: m.cands, hi: false });
+    const gp = gapOf(m.key);
+    if (gp) { // the space between the items: only flex / grid parts have any
+      dw.gapOK = /flex|grid/.test(cs.display);
+      dw.gapOrig = parseFloat(cs.columnGap) || parseFloat(cs.rowGap) || 0;
+      dw.gap = gp.value;
+      dw.rowDir = cs.display.includes('flex') && cs.flexDirection.startsWith('row');
+      dw.kids = src.children.length;
+      if (dw.gapOK) { clone.classList.add('gapview'); clone.style.gap = dw.gapOrig + 'px'; }
+    }
+    if (pad) {
+      const ov = el('div', 'pv-pad');
+      ov.style.padding = orig;
+      clone.append(ov);
+      dw.ov = ov;
+      dw.pad = true; dw.vals = pad.vals.slice(); dw.N = Math.max(...dw.vals); dw.hi = false;
+    }
+    stage.append(scale);
+  }
+  if (amb && e && m.cands.length > 1) { // back / forward through the guesses, the same as the left and right arrow keys
+    const chev = d => `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="${d}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    const n = m.cands.length;
+    const mkArrow = (side, d, dir, label) => { // wraps: back from 1 lands on the last guess, forward from the last lands on 1
+      const b = el('button', 'dw-arrow ' + side);
+      b.type = 'button';
+      b.setAttribute('aria-label', label);
+      b.innerHTML = chev(d);
+      b.addEventListener('click', () => go(m.key, (m.idx + dir + n) % n, dir));
+      return b;
+    };
+    stage.append(
+      mkArrow('l', 'M9 3L5 7L9 11', -1, 'Previous guess'),
+      mkArrow('r', 'M5 3L9 7L5 11', 1, 'Next guess'));
+  }
+  root.append(stage);
+
+  const gp0 = e ? gapOf(m.key) : null;
+  if ((pad || gp0) && e) {
+    const row = el('div', 'dw-pad');
+    const labelled = !!(pad && gp0); // two rows need names; a lone row doesn't
+    // one line per property: [numbers] ... [design system button]; the button swaps the numbers for the spacing variables in the same spot
+    const mkRow = (kind, label) => {
+      const isGap = kind === 'gap';
+      const line = el('div', 'line new');
+      if (labelled) line.append(el('span', 'rl', label));
+      if (isGap && !dw.gapOK) { line.append(el('span', 'rn', 'No items to space in this part')); return line; }
+      const grp = el('div', 'grp');
+      const inputs = (isGap ? [0] : [0, 1, 2, 3]).map(i => {
+        const cell = el('label', 'cell');
+        const input = el('input');
+        input.type = 'number'; input.min = 0; input.max = 200; input.step = 1; input.value = isGap ? dw.gap : dw.vals[i];
+        input.setAttribute('inputmode', 'numeric');
+        input.setAttribute('aria-label', isGap ? 'Gap in pixels' : ['Top', 'Right', 'Bottom', 'Left'][i] + ' padding in pixels');
+        input.addEventListener('input', () => {
+          const n = parseFloat(input.value);
+          if (!Number.isFinite(n) || n < 0) return;
+          isGap ? setGapValue(Math.min(n, 200)) : setPadValue(Math.min(n, 200), i);
+        });
+        cell.append(input);
+        grp.append(cell);
+        return input;
+      });
+      const vh = el('button', 'vars-h');
+      vh.type = 'button';
+      vh.title = 'Design system · Spacing variables';
+      vh.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1l5 5-5 5-5-5z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/></svg><em>Spacing</em><svg class="chev" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      const slot = el('div', 'slot');
+      const nums = el('div', 'nums');
+      nums.append(grp);
+      const vars = el('div', 'vars');
+      slot.append(nums, vars);
+      // open until the button is clicked again or the pointer goes down anywhere outside the variables
+      const away = ev => {
+        if (!vars.isConnected) { document.removeEventListener('pointerdown', away, true); return; }
+        if (!vars.contains(ev.target) && !vh.contains(ev.target)) showVars(false);
+      };
+      const showVars = on => {
+        varsOpen[kind] = on;
+        slot.classList.toggle('vars-on', on);
+        nums.inert = on; vars.inert = !on;
+        vh.setAttribute('aria-expanded', String(on));
+        document.removeEventListener('pointerdown', away, true);
+        if (on) document.addEventListener('pointerdown', away, true);
+      };
+      showVars(!!varsOpen[kind]);
+      vh.addEventListener('click', () => showVars(!varsOpen[kind]));
+      const btns = VARS.map(([name, v]) => {
+        const b = el('button');
+        b.type = 'button';
+        b.innerHTML = `<b>${v}</b>${name}`;
+        b.title = `Design system · space/${name} = ${v}px`;
+        b.addEventListener('click', () => { isGap ? setGapValue(v) : setPadValue(v); }); // picking one sets the value; the variables stay open for the next pick
+        vars.append(b);
+        return [b, v];
+      });
+      line.append(slot, vh);
+      (dw.rows ||= {})[kind] = { inputs, btns, now: vh.querySelector('em') };
+      return line;
+    };
+    if (pad) row.append(mkRow('padding', 'Padding'));
+    if (gp0) row.append(mkRow('gap', 'Gap'));
+    root.append(row);
+    queueMicrotask(markVars);
+  }
+
+  const foot = el('div', 'dw-foot');
+  if (amb && e) {
+    const no = el('button', 'ask-btn plain', 'No');
+    const yes = el('button', 'ask-btn primary', 'Yes');
+    no.type = yes.type = 'button';
+    no.addEventListener('click', () => reject(m.key));
+    yes.addEventListener('click', () => accept(m.key));
+    foot.append(yes, no);
+    root.insertBefore(foot, stage);
+  } else if (amb && !e) {
+    const again = el('button', 'ask-btn plain', 'Start over');
+    again.type = 'button';
+    again.addEventListener('click', () => { guess[m.key] = 0; refresh(); showMark(m.key, true); });
+    foot.append(again);
+    root.insertBefore(foot, stage);
+  }
+  return root;
+}
+// number variables shared by the whole document: picking one sets the padding to its value, so spacing stays consistent
+let varsOpen = {}; // per row (padding / gap): stays as left while the drawer is open; closed again each time the drawer closes
+const VARS = [['xs', 4], ['sm', 8], ['md', 12], ['lg', 16], ['xl', 24], ['2xl', 32]];
+const fmtN = n => (Number.isInteger(n) ? n : +n.toFixed(1)) + 'px';
+
+const MAX_PREVIEW = 0.75; // previews are shown at three quarters of life size at most
+function stageNeed(cands, aw) {
+  const need = n => Math.min(260, n.offsetHeight * Math.min(aw / n.offsetWidth, MAX_PREVIEW) + 24);
+  return Math.round(Math.max(132, ...(cands || []).map(id => EL[id]).filter(Boolean).map(e => need(e.node))));
+}
+function fitStage() {
+  if (!dw || !dw.scale) return;
+  const stage = dw.stage;
+  const pm = Math.min(dw.N || 0, 60);
+  const tw = dw.W + 2 * pm, th = dw.fixed ? dw.H : dw.H + 2 * pm;
+  const aw = stage.clientWidth - 28;
+  const fitW = aw / tw;
+  // something narrow and tall would be tiny in the fixed-height box, so the box grows (up to 260px) to show it near full size.
+  // It's sized for the biggest of the candidates for this phrase, so pressing No (or an arrow) never changes its height: the
+  // drawer stays put under the pointer. Padding is left out of the sum so editing the number can't make it jump either.
+  const want = stageNeed(dw.cands, aw);
+  if (want !== dw.stageH) { stage.style.height = want + 'px'; dw.stageH = want; }
+  const ah = stage.clientHeight - 24;
+  const s = Math.max(Math.min(fitW, ah / th, MAX_PREVIEW), Math.min(fitW, 0.5));
+  const first = !dw.fitted; // the first fit of a new preview lands instantly: it should only slide in, never scale
+  if (first) dw.scale.style.transition = 'none';
+  dw.scale.style.setProperty('--s', s.toFixed(3));
+  const tall = th * s > ah;
+  dw.scale.classList.toggle('top', tall);
+  if (first) { void dw.scale.offsetWidth; dw.scale.style.transition = ''; dw.fitted = true; }
+}
+function fitGrid() {
+  if (!dw || !dw.tiles) return;
+  dw.tiles.forEach(t => {
+    const aw = t.ts.clientWidth - 16, ah = t.ts.clientHeight - 16;
+    const s = Math.min(aw / t.W, MAX_PREVIEW); // sized by width only: a tall part keeps its size and the tile shows just its top
+    t.scale.style.transition = 'none'; // a new preview lands at its size, it doesn't scale into place
+    t.scale.style.setProperty('--s', s.toFixed(3));
+    t.scale.classList.toggle('top', t.H * s > ah);
+  });
+}
+function live(on) { dw.clone.classList.toggle('live', on); if (dw.ov) dw.ov.classList.toggle('live', on); }
+function applyPad() {
+  if (!dw || !dw.clone) return;
+  let w = dw.W;
+  if (dw.vals) {
+    const v = dw.hi ? dw.vals.map(n => n + 'px').join(' ') : dw.orig;
+    dw.clone.style.padding = v;
+    // padding adds to the width instead of squeezing the content (which would clip it): widen by the horizontal padding gained
+    w = dw.W - dw.side[1] - dw.side[3] + (dw.hi ? dw.vals[1] + dw.vals[3] : dw.side[1] + dw.side[3]);
+    if (dw.ov) { dw.ov.style.padding = v; dw.ov.classList.toggle('old', !dw.hi); }
+  }
+  if (dw.gap !== undefined && dw.gapOK) {
+    const g = dw.hi ? dw.gap : dw.gapOrig;
+    dw.clone.style.gap = g + 'px';
+    if (dw.rowDir && dw.kids > 1) w += (dw.kids - 1) * (g - dw.gapOrig); // a row grows by the gap it gains between each pair
+  }
+  dw.clone.style.width = w + 'px';
+}
+// animate to the old or the new values and stay there
+function goTo(hi) {
+  if (!dw || !dw.clone || dw.hi === hi) return;
+  clearTimeout(dw.t0);
+  live(false);
+  dw.hi = hi;
+  applyPad();
+}
+function markVars() {
+  if (!dw || !dw.rows) return;
+  for (const [kind, r] of Object.entries(dw.rows)) {
+    const vals = kind === 'gap' ? [dw.gap] : dw.vals;
+    const uni = vals.every(v => v === vals[0]);
+    r.btns.forEach(([b, v]) => b.classList.toggle('on', uni && v === vals[0]));
+    const hit = uni && VARS.find(([, v]) => v === vals[0]); // the button names the variable in use, so it shows while collapsed too
+    r.now.textContent = hit ? 'space/' + hit[0] : 'Spacing';
+  }
+}
+function startAnim() {
+  dw.t0 = setTimeout(() => goTo(true), 450); // play old -> new once, then stay
+}
+// a number in the chat changed: follow it at once, hold, then settle
+function follow() {
+  fitStage();
+  clearTimeout(dw.t0);
+  dw.hi = true;
+  live(true);
+  applyPad();
+  dw.t0 = setTimeout(() => live(false), 400);
+}
+function updatePad(pad) {
+  if (!dw || !dw.pad || !pad || pad.vals.every((v, i) => v === dw.vals[i])) return;
+  dw.vals = pad.vals.slice(); dw.N = Math.max(...dw.vals);
+  markVars();
+  const r = dw.rows && dw.rows.padding;
+  if (r) r.inputs.forEach((inp, i) => { if (document.activeElement !== inp) inp.value = dw.vals[i]; });
+  follow();
+}
+function updateGap(gp) {
+  if (!dw || dw.gap === undefined || !gp || gp.value === dw.gap) return;
+  dw.gap = gp.value;
+  markVars();
+  const r = dw.rows && dw.rows.gap;
+  if (r) r.inputs.forEach(inp => { if (document.activeElement !== inp) inp.value = dw.gap; });
+  follow();
+}
+
+// edit the number in the chat text itself, so the drawer and the message never disagree
+function setPadValue(n, side = null) {
+  const p = dw && padOf(dw.key);
+  if (!p) return;
+  const v = side === null ? [n, n, n, n] : dw.vals.map((x, i) => i === side ? n : x);
+  inputEl.setRangeText(fmtPad(...v), p.numStart, p.numEnd, 'end');
+  refresh();
+}
+function setGapValue(n) {
+  const p = dw && gapOf(dw.key);
+  if (!p) return;
+  inputEl.setRangeText(String(n), p.numStart, p.numEnd, 'end');
+  refresh();
+}
+
+// steps in the drawer, newest last, so Cmd/Ctrl+Z can take back a Yes, a No, or an arrow-key move
+const undoStack = [];
+let swapDir = 1; // 1: the next preview comes in from the right; -1: from the left
+function go(key, to, dir = 0) {
+  const prev = guess[key] || 0;
+  if (to === prev) return;
+  undoStack.push({ kind: 'guess', key, prev });
+  swapDir = dir || (to > prev ? 1 : -1); // wrapping round (4 back to 1) still slides the way the button points
+  guess[key] = to;
+  if (dw) dw.swapNext = true;
+  refresh();
+  showMark(key, true);
+}
+let pickedKey = null; // the phrase whose guess was just chosen from the grid: its drawer is built as the single-preview confirmation
+function pick(key, i) {
+  const prev = guess[key] || 0;
+  if (i !== prev) { undoStack.push({ kind: 'guess', key, prev }); guess[key] = i; refresh(); }
+  pickedKey = key;
+  if (dw) dw.sig = ''; // force a rebuild even when the best guess was the one picked
+  showMark(key);
+  pickedKey = null;
+  accept(key);
+}
+function reject(key) { go(key, (guess[key] || 0) + 1); }
+function undo() {
+  const u = undoStack.pop();
+  if (!u) return;
+  pinned = false;
+  if (u.kind === 'guess') {
+    swapDir = (guess[u.key] || 0) > u.prev ? -1 : 1;
+    guess[u.key] = u.prev;
+    if (dw) dw.swapNext = true;
+    refresh();
+    showMark(u.key, true);
+  } else { // a Yes: put the original wording back and ask the question again
+    inputEl.value = u.text;
+    dismissed = null; hoverKey = null;
+    refresh();
+    inputEl.focus();
+    setSel(u.sel);
+    showMark(u.key);
+  }
+}
+// left / right step through the guesses while the drawer is asking; Cmd/Ctrl+Z undoes
+window.addEventListener('keydown', e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'z' && undoStack.length) {
+    e.preventDefault();
+    undo();
+    return;
+  }
+  if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || mod || e.shiftKey || e.altKey || e.isComposing) return;
+  if (mode !== 'mark' || !isOpen() || pinned || !dw || dw.grid) return;
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return; // arrows belong to the number fields
+  if (inputEl.selectionStart !== inputEl.selectionEnd) return;
+  const m = findEl(dw.key);
+  if (!m || m.state !== 'amb') return;
+  const cur = guess[dw.key] || 0;
+  const n = m.cands.length, dir = e.key === 'ArrowRight' ? 1 : -1;
+  const to = m.id ? (cur + dir + n) % n : (dir > 0 ? 0 : n - 1); // wraps round; out of guesses, either arrow re-enters the list
+  e.preventDefault();
+  go(dw.key, to, dir);
+}, true);
+function replaceMark(m, id) {
+  inputEl.setRangeText('[' + EL[id].label + ']', m.start, m.end, 'end');
+  refresh();
+}
+function accept(key) {
+  const m = findEl(key);
+  if (!m || !m.id) return;
+  const label = EL[m.id].label;
+  dw.q.classList.add('collapse'); // the question's wording folds away until only the part's name is left
+  dw.q.querySelector('.dw-n')?.remove();
+  dw.stage.querySelectorAll('.dw-arrow').forEach(a => a.classList.add('out'));
+  dw.stage.parentNode.querySelectorAll('.dw-foot').forEach(f => f.hidden = true);
+  fitMenu();
+  stopAnim();
+  undoStack.push({ kind: 'yes', key, text: inputEl.value, sel: m.end });
+  pinned = true;
+  replaceMark(m, m.id);
+  const nm = els.find(x => x.start === m.start); // the phrase is now "[Label]", which has a new key
+  if (nm) dw.key = nm.key;
+  updatePad(padOf(dw.key)); updateGap(gapOf(dw.key));
+  hoverKey = null; dismissed = null;
+  inputEl.focus();
+  setSel(caretMem);
+}
+
+window.addEventListener('pointerdown', e => {
+  if (!isOpen()) return;
+  if (menuEl.contains(e.target) || slashEl.contains(e.target) || e.target.closest('.grip')) return; // resizing keeps the drawer open
+  if (mode === 'mark' && (inputEl.contains(e.target) || e.target === inputEl)) return;
+  if (mode === 'mark') dismissed = hoverKey || caretKey;
+  setMenu(false);
+});
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && isOpen()) { if (mode === 'mark') dismissed = hoverKey || caretKey; setMenu(false); }
+});
+
+/* ---------- composer ---------- */
+inputEl.addEventListener('input', e => {
+  pinned = false;
+  undoStack.length = 0; // typing has its own history now
+  if (e.isComposing) { sendEl.disabled = !inputEl.value.trim(); return; } // let an IME finish before re-rendering
+  refresh();
+});
+inputEl.addEventListener('compositionend', refresh);
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); composerEl.requestSubmit(); }
+  if (e.key === 'Backspace' && chipEl && inputEl.selectionStart === 0 && inputEl.selectionEnd === 0) { e.preventDefault(); clearChip(); }
+});
+
+composerEl.addEventListener('submit', e => {
+  e.preventDefault();
+  const typed = inputEl.value;
+  if (!typed.trim()) return;
+  const text = chipCmd ? chipCmd + ' ' + typed : typed;
+  const a = analyze(typed);
+  document.querySelector('.empty')?.remove();
+  const u = el('div', 'msg user');
+  u.innerHTML = marksHtml(typed, a, true).replace('​', '');
+  listEl.append(u);
+  inputEl.value = '';
+  clearChip();
+  hoverKey = caretKey = dismissed = null;
+  if (mode === 'mark') closeMark();
+  refresh();
+  for (const k in guess) delete guess[k];
+  undoStack.length = 0;
+  setTimeout(() => respond(a), 450);
+  listEl.scrollTop = listEl.scrollHeight;
+});
+
+// a stand-in for the agent: say what it understood, and apply padding changes to the wireframe
+function respond(a) {
+  const ai = el('div', 'msg ai');
+  if (!a.els.length) {
+    ai.textContent = "Which part of the UI do you mean? Try naming it, like the header or the right panel.";
+  } else {
+    const parts = [];
+    const seenIds = new Set();
+    a.els.forEach(m => {
+      const id = m.id ?? m.cands[0], e = EL[id];
+      const p = a.pads.find(p => p.key === m.key && p.kind !== 'gap'), g = a.pads.find(p => p.key === m.key && p.kind === 'gap');
+      const note = m.state === 'amb' ? ` (I took “${esc(m.text)}” to mean that)` : '';
+      if (p || g) {
+        e.node.classList.add('flash');
+        setTimeout(() => e.node.classList.remove('flash'), 1400);
+        if (p) {
+          e.node.style.padding = p.vals.map(v => v + 'px').join(' ');
+          parts.push(`Set the padding on the <mark class="ok">${esc(e.label)}</mark> to <b>${p.vals.every(v => v === p.vals[0]) ? fmtN(p.vals[0]) : p.vals.map(fmtN).join(' ')}</b>${note}.`);
+        }
+        if (g) {
+          e.node.style.gap = g.value + 'px';
+          parts.push(`Set the gap between the items in the <mark class="ok">${esc(e.label)}</mark> to <b>${fmtN(g.value)}</b>${p ? '' : note}.`);
+        }
+      } else if (!seenIds.has(id)) {
+        parts.push(`Looking at the <mark class="ok">${esc(e.label)}</mark>${note}. What should change?`);
+      }
+      seenIds.add(id);
+    });
+    ai.innerHTML = parts.join('<br>');
+  }
+  listEl.append(ai);
+  listEl.scrollTop = listEl.scrollHeight;
+}
+
+document.querySelectorAll('.empty button').forEach(b => b.addEventListener('click', () => {
+  inputEl.value = b.textContent; refresh(); inputEl.focus();
+  inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+}));
+
+refresh();
+inputEl.focus();
+// resizing the chat window by its side edges
+(() => {
+  const app = document.querySelector('.app');
+  ['l', 'r'].forEach(side => {
+    const g = el('div', 'grip ' + side);
+    app.append(g);
+    g.addEventListener('pointermove', e => { // the line and pill follow the pointer along the edge
+      const r = g.getBoundingClientRect();
+      g.style.setProperty('--y', Math.max(18, Math.min(e.clientY - r.top, r.height - 18)) + 'px');
+    });
+    g.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      g.setPointerCapture(e.pointerId);
+      g.classList.add('on');
+      document.body.classList.add('resizing');
+      const x0 = e.clientX, w0 = app.offsetWidth;
+      const move = ev => {
+        const dx = (ev.clientX - x0) * (side === 'r' ? 1 : -1);
+        const w = Math.round(Math.max(320, Math.min(window.innerWidth - 80, 900, w0 + dx * 2)));
+        document.documentElement.style.setProperty('--app-w', w + 'px');
+        fitStage(); fitMenu();
+      };
+      const up = () => {
+        g.classList.remove('on');
+        document.body.classList.remove('resizing');
+        g.removeEventListener('pointermove', move);
+        g.removeEventListener('pointerup', up);
+        g.removeEventListener('pointercancel', up);
+      };
+      g.addEventListener('pointermove', move);
+      g.addEventListener('pointerup', up);
+      g.addEventListener('pointercancel', up);
+    });
+  });
+})();
+
+// start scrolled to the latest message, and stay there once fonts and layout settle
+const toEnd = () => { listEl.scrollTop = listEl.scrollHeight; };
+toEnd(); requestAnimationFrame(toEnd);
+window.addEventListener('load', toEnd);
+document.fonts && document.fonts.ready.then(toEnd);
+
+</script>
+</body></html>
